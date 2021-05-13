@@ -111,7 +111,7 @@ class DVRDataset(torch.utils.data.Dataset):
 
         rgb_paths = [
             x
-            for x in glob.glob(os.path.join(root_dir, "image", "*"))
+            for x in glob.glob(os.path.join('rs_dtu_4/dtu_rect/Rectified/{}_train/*'.format(root_dir.split('/')[-1])))
             if (x.endswith(".jpg") or x.endswith(".png"))
         ]
         rgb_paths = sorted(rgb_paths)
@@ -261,14 +261,14 @@ class DVRDataset(torch.utils.data.Dataset):
         result = {
             "path": root_dir,
             "img_id": index,
-            "focal": focal,
+            "focal": focal*2,
             "images": all_imgs,
             "poses": all_poses,
         }
         if all_masks is not None:
             result["masks"] = all_masks
         if self.sub_format != "shapenet":
-            result["c"] = c
+            result["c"] = (c - torch.Tensor([40., 22.]))*2
         else:
             result["bbox"] = all_bboxes
         return result

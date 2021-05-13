@@ -11,6 +11,8 @@ sys.path.insert(
 )
 
 import torch
+import time
+import lpips
 import numpy as np
 import imageio
 import skimage.measure
@@ -64,12 +66,12 @@ def read_pfm(filename):
     return data, scale
 
 
-def read_masks(obj_name, targets):
+def read_masks(obj_name, targets, scale):
     masks = []
     for target in targets:
         depth_path = './rs_dtu_4/dtu_rect/Depths_Rect/{}_train/depth_map_{:04d}.pfm'.format(obj_name, target)
         depth = read_pfm(depth_path)[0]
-        depth = cv2.resize(depth, None, fx=2., fy=2.)
+        depth = cv2.resize(depth, None, fx=4.*scale, fy=4.*scale)
         mask = np.logical_and(depth>425., depth<935.)
         masks.append(mask)
     return masks
@@ -155,7 +157,10 @@ has_output = len(output_dir) > 0
 
 total_psnr = 0.0
 total_ssim = 0.0
+total_lpips = 0.0
 cnt = 0
+stat_time = []
+# lpips_vgg = lpips.LPIPS(net="vgg").to(device=device)
 
 if has_output:
     finish_path = os.path.join(output_dir, "finish.txt")
@@ -249,9 +254,9 @@ with torch.no_grad():
             # print("(skip)")
             # continue
         images = data["images"][0]  # (NV, 3, H, W)
-        images = images[:, :, 22:278, 40:360]
-        data['c'][:, 0] -= 40
-        data['c'][:, 1] -= 22
+        # images = images[:, :, 22:278, 40:360]
+        # data['c'][:, 0] -= 40
+        # data['c'][:, 1] -= 22
 
         NV, _, H, W = images.shape
 
@@ -265,7 +270,7 @@ with torch.no_grad():
                     )
                 )
             H, W = Ht, Wt
-
+        all_rays = None
         if all_rays is None or use_source_lut or args.free_pose:
             if use_source_lut:
                 obj_id = cat_name + "/" + obj_basename
@@ -329,12 +334,16 @@ with torch.no_grad():
         )
 
         all_rgb, all_depth = [], []
+        torch.cuda.synchronize()
+        start_time = time.time()
         for rays in tqdm.tqdm(rays_spl):
             rgb, depth = render_par(rays[None])
             rgb = rgb[0].cpu()
             depth = depth[0].cpu()
             all_rgb.append(rgb)
             all_depth.append(depth)
+        torch.cuda.synchronize()
+        stat_time.append(time.time() - start_time)
 
         all_rgb = torch.cat(all_rgb, dim=0)
         all_depth = torch.cat(all_depth, dim=0)
@@ -367,14 +376,20 @@ with torch.no_grad():
 
         curr_ssim = 0.0
         curr_psnr = 0.0
+        cur_lpips = 0.0
         if not args.no_compare_gt:
             images_0to1 = images * 0.5 + 0.5  # (NV, 3, H, W)
             images_gt = images_0to1[target_view_mask]
             rgb_gt_all = (
                 images_gt.permute(0, 2, 3, 1).contiguous().numpy()
             )  # (NV-NS, H, W, 3)
-            masks = read_masks(obj_name, target.detach().cpu().numpy())
+            masks = read_masks(obj_name, target.detach().cpu().numpy(), args.scale)
             import matplotlib.pyplot as plt
+            rgb_gt_all_ = []
+            if args.scale == 0.5:
+                for rgb_gt in rgb_gt_all:
+                    rgb_gt_all_.append(cv2.resize(rgb_gt, None, fx=args.scale, fy=args.scale))
+            rgb_gt_all = np.stack(rgb_gt_all_)
             for view_idx in range(n_gen_views):
                 psnr = skimage.measure.compare_psnr(
                     all_rgb[view_idx][masks[view_idx]], rgb_gt_all[view_idx][masks[view_idx]], data_range=1
@@ -430,3 +445,4 @@ with torch.no_grad():
             "{} {} {} {}\n".format(obj_name, curr_psnr, curr_ssim, curr_cnt)
         )
 print("final psnr", total_psnr / cnt, "ssim", total_ssim / cnt)
+print('time: ', np.mean(stat_time))
