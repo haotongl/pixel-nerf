@@ -201,6 +201,9 @@ with torch.no_grad():
             print("(skip)")
             continue
         images = data["images"][0]  # (NV, 3, H, W)
+        images = images[:, :, 22:278, 40:360]
+        data['c'][:, 0] -= 40
+        data['c'][:, 1] -= 22
 
         NV, _, H, W = images.shape
 
