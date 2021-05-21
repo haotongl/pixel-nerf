@@ -174,11 +174,18 @@ class NeRFRenderer(torch.nn.Module):
         """
         with profiler.record_function("renderer_composite"):
             B, K = z_samp.shape
+            z_samp_norm = z_samp.clone()
 
-            deltas = z_samp[:, 1:] - z_samp[:, :-1]  # (B, K-1)
+            z_samp_norm -= z_samp_norm.min()
+            z_samp_norm = (z_samp_norm / z_samp_norm.max())*4.9 + 0.1
+
+            deltas = z_samp_norm[:, 1:] - z_samp_norm[:, :-1]  # (B, K-1)
+            # deltas = z_samp[:, 1:] - z_samp_norm[:, :-1]  # (B, K-1)
             #  if far:
             #      delta_inf = 1e10 * torch.ones_like(deltas[:, :1])  # infty (B, 1)
-            delta_inf = rays[:, -1:] - z_samp[:, -1:]
+            # delta_inf = rays[:, -1:] - z_samp[:, -1:]
+            delta_inf = deltas[:, -1:]
+            # delta_inf = rays[:, -1:] - z_samp[:, -1:]
             deltas = torch.cat([deltas, delta_inf], -1)  # (B, K)
 
             # (B, K, 3)
@@ -226,15 +233,15 @@ class NeRFRenderer(torch.nn.Module):
                 sigmas = sigmas + torch.randn_like(sigmas) * self.noise_std
 
             alphas = 1 - torch.exp(-deltas * torch.relu(sigmas))  # (B, K)
-            deltas = None
-            sigmas = None
+            # deltas = None
+            # sigmas = None
             alphas_shifted = torch.cat(
                 [torch.ones_like(alphas[:, :1]), 1 - alphas + 1e-10], -1
             )  # (B, K+1) = [1, a1, a2, ...]
             T = torch.cumprod(alphas_shifted, -1)  # (B)
             weights = alphas * T[:, :-1]  # (B, K)
-            alphas = None
-            alphas_shifted = None
+            # alphas = None
+            # alphas_shifted = None
 
             rgb_final = torch.sum(weights.unsqueeze(-1) * rgbs, -2)  # (B, 3)
             depth_final = torch.sum(weights * z_samp, -1)  # (B)
@@ -360,7 +367,7 @@ class NeRFRenderer(torch.nn.Module):
         :param net A PixelNeRF network
         :param gpus list of GPU ids to parallize to. If length is 1,
         does not parallelize
-        :param simple_output only returns rendered (rgb, depth) instead of the 
+        :param simple_output only returns rendered (rgb, depth) instead of the
         full render output map. Saves data tranfer cost.
         :return torch module
         """

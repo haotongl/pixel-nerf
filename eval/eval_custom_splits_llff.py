@@ -201,9 +201,9 @@ with torch.no_grad():
             print("(skip)")
             continue
         images = data["images"][0]  # (NV, 3, H, W)
-        images = images[:, :, 22:278, 40:360]
-        data['c'][:, 0] -= 40
-        data['c'][:, 1] -= 22
+        # images = images[:, :, 22:278, 40:360]
+        # data['c'][:, 0] -= 40
+        # data['c'][:, 1] -= 22
 
         NV, _, H, W = images.shape
 
@@ -219,12 +219,14 @@ with torch.no_grad():
             H, W = Ht, Wt
 
         all_rays = None
+        z_near = data['bds'][0].item()
+        z_far = data['bds'][1].item()
         if all_rays is None or use_source_lut or args.free_pose:
             if use_source_lut:
                 obj_id = cat_name + "/" + obj_basename
                 source = source_lut[obj_id]
 
-            splits = np.load('eval/Splits/{}/split.npy'.format(obj_name), allow_pickle=True).item()
+            splits = np.load('rs_dtu_4/nerf_llff_data/{}/split.npy'.format(obj_name), allow_pickle=True).item()
             source = torch.Tensor(splits['gen']).long()
             NS = len(source)
             src_view_mask = torch.zeros(NV, dtype=torch.bool)
@@ -242,9 +244,9 @@ with torch.no_grad():
             poses = data["poses"][0]  # (NV, 4, 4)
             src_poses = poses[src_view_mask].to(device=device)  # (NS, 4, 4)
 
-            target_view_mask = target_view_mask_init.clone()
-            if not args.include_src:
-                target_view_mask *= ~src_view_mask
+            # target_view_mask = target_view_mask_init.clone()
+            # if not args.include_src:
+                # target_view_mask *= ~src_view_mask
             target = torch.Tensor(splits['test']).long()
             target_view_mask = torch.zeros(NV, dtype=torch.bool)
             target_view_mask[target] = 1
@@ -252,7 +254,6 @@ with torch.no_grad():
             novel_view_idxs = target_view_mask.nonzero(as_tuple=False).reshape(-1)
 
             poses = poses[target_view_mask]  # (NV[-NS], 4, 4)
-            __import__('ipdb').set_trace()
 
             all_rays = (
                 util.gen_rays(

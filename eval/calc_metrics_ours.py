@@ -102,15 +102,32 @@ def read_dtu_pred_images(scene_path):
         gts.append(gt/255.)
     return np.stack(gts), np.stack(preds)
 
+def read_llff_pred_images(scene_path):
+    images = os.listdir(scene_path)
+    images.sort()
+    preds = []
+    gts = []
+    for image in images:
+        if 'compare' not in image:
+            continue
+        img = np.array(Image.open(scene_path + '/' + image))
+        pred = img[:, :480]
+        gt = img[:, 480:]
+        preds.append(pred/255.)
+        gts.append(gt/255.)
+    return np.stack(gts), np.stack(preds)
+
 def run_main(args):
     root_name = args.evaldir.split('/')[-1].split('_')[0]
     ps, ss, ls = [], [], []
     for en in os.scandir(args.evaldir):
         if not en.is_dir():
             continue
-        gt_images, gt_masks = read_gt_images(en.name, True)
+        # gt_images, gt_masks = read_gt_images(en.name, True)
         # gt_masks = None
-        gt_images, pred_images = read_dtu_pred_images(en.path)
+        # gt_images, pred_images = read_dtu_pred_images(en.path)
+        gt_masks = None
+        gt_images, pred_images = read_llff_pred_images(en.path)
         p, s, l = eval_metric(en.name, gt_images, pred_images, gt_masks)
         ps.append(p)
         ss.append(s)
