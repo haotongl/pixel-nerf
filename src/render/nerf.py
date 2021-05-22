@@ -108,7 +108,7 @@ class NeRFRenderer(torch.nn.Module):
         B = rays.shape[0]
         z_steps = torch.linspace(0, 1 - step, self.n_coarse, device=device)  # (Kc)
         z_steps = z_steps.unsqueeze(0).repeat(B, 1)  # (B, Kc)
-        z_steps += torch.rand_like(z_steps) * step
+        # z_steps += torch.rand_like(z_steps) * step
         if not self.lindisp:  # Use linear sampling in depth space
             return near * (1 - z_steps) + far * z_steps  # (B, Kf)
         else:  # Use linear sampling in disparity space

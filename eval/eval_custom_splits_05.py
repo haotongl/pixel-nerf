@@ -252,7 +252,6 @@ with torch.no_grad():
             novel_view_idxs = target_view_mask.nonzero(as_tuple=False).reshape(-1)
 
             poses = poses[target_view_mask]  # (NV[-NS], 4, 4)
-            __import__('ipdb').set_trace()
 
             all_rays = (
                 util.gen_rays(
@@ -283,12 +282,20 @@ with torch.no_grad():
         )
 
         all_rgb, all_depth = [], []
+        import time
+        times = []
         for rays in tqdm.tqdm(rays_spl):
+            torch.cuda.synchronize()
+            start_time = time.time()
             rgb, depth = render_par(rays[None])
+            torch.cuda.synchronize()
+            end_time = time.time()
+            times.append(end_time-start_time)
             rgb = rgb[0].cpu()
             depth = depth[0].cpu()
             all_rgb.append(rgb)
             all_depth.append(depth)
+        print('mean: ', np.sum(times)/4.)
 
         all_rgb = torch.cat(all_rgb, dim=0)
         all_depth = torch.cat(all_depth, dim=0)

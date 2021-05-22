@@ -126,6 +126,8 @@ class LLFFDataset(torch.utils.data.Dataset):
         # cam_to_world
         all_poses_ = [all_cam['poses'][i] for i in range(len(all_cam['poses']))]
         all_poses = [self._coord_trans_world @ torch.tensor(all_cam['poses'][i], dtype=torch.float32) @ self._coord_trans_cam for i in range(len(all_cam['poses']))]
+        # all_poses_ = [torch.tensor(all_cam['poses'][i], dtype=torch.float32) for i in range(len(all_cam['poses']))]
+        # all_poses = [torch.cat([pose[:, :1], -pose[:, 1:2], -pose[:, 2:3], pose[:, 3:]], dim=-1) for pose in all_poses_]
         all_imgs = [self.image_to_tensor(imageio.imread(rgb_path)[..., :3]) for rgb_path in rgb_paths]
         focal = all_cam['camera_params'][0][0] / 4.
         focal = torch.tensor((focal, focal), dtype=torch.float32)
@@ -142,8 +144,10 @@ class LLFFDataset(torch.utils.data.Dataset):
         c *= 0.5
         focal *= 0.5
         # =======
+        scale = 0.1
+        all_poses[:, :3, 3] *=scale
         all_masks = None
-        bds = (all_cam['depth_ranges'].min(), all_cam['depth_ranges'].max())
+        bds = (np.array(all_cam['depth_ranges']).min()*scale, np.array(all_cam['depth_ranges']).max()*scale)
         result = {
             "path": root_dir,
             "img_id": index,
