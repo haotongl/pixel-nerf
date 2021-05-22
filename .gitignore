@@ -25,3 +25,4 @@ logs/
 rs_dtu_4
 eval/Splits/
 eval_out/
+data/
