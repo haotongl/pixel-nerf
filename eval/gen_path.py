@@ -87,7 +87,7 @@ def extra_args(parser):
     )
     return parser
 
-
+__import__('ipdb').set_trace()
 args, conf = util.args.parse_args(
     extra_args, default_conf="conf/resnet_fine_mv.conf", default_expname="shapenet",
 )
@@ -197,13 +197,14 @@ with torch.no_grad():
         obj_basename = os.path.basename(dpath)
         cat_name = os.path.basename(os.path.dirname(dpath))
         obj_name = cat_name + "_" + obj_basename if args.multicat else obj_basename
+        __import__('ipdb').set_trace()
         if has_output and obj_name in finished:
             print("(skip)")
             continue
         images = data["images"][0]  # (NV, 3, H, W)
-        # images = images[:, :, 22:278, 40:360]
-        # data['c'][:, 0] -= 40
-        # data['c'][:, 1] -= 22
+        images = images[:, :, 22:278, 40:360]
+        data['c'][:, 0] -= 40
+        data['c'][:, 1] -= 22
 
         NV, _, H, W = images.shape
 
@@ -219,14 +220,12 @@ with torch.no_grad():
             H, W = Ht, Wt
 
         all_rays = None
-        z_near = data['bds'][0].item()
-        z_far = data['bds'][1].item()
         if all_rays is None or use_source_lut or args.free_pose:
             if use_source_lut:
                 obj_id = cat_name + "/" + obj_basename
                 source = source_lut[obj_id]
 
-            splits = np.load('rs_dtu_4/nerf_llff_data/{}/split.npy'.format(obj_name), allow_pickle=True).item()
+            splits = np.load('eval/Splits/{}/split.npy'.format(obj_name), allow_pickle=True).item()
             source = torch.Tensor(splits['gen']).long()
             NS = len(source)
             src_view_mask = torch.zeros(NV, dtype=torch.bool)
@@ -244,9 +243,9 @@ with torch.no_grad():
             poses = data["poses"][0]  # (NV, 4, 4)
             src_poses = poses[src_view_mask].to(device=device)  # (NS, 4, 4)
 
-            # target_view_mask = target_view_mask_init.clone()
-            # if not args.include_src:
-                # target_view_mask *= ~src_view_mask
+            target_view_mask = target_view_mask_init.clone()
+            if not args.include_src:
+                target_view_mask *= ~src_view_mask
             target = torch.Tensor(splits['test']).long()
             target_view_mask = torch.zeros(NV, dtype=torch.bool)
             target_view_mask[target] = 1
@@ -284,19 +283,20 @@ with torch.no_grad():
         )
 
         all_rgb, all_depth = [], []
-        times = []
         import time
+        times = []
         for rays in tqdm.tqdm(rays_spl):
             torch.cuda.synchronize()
             start_time = time.time()
             rgb, depth = render_par(rays[None])
             torch.cuda.synchronize()
-            times.append(time.time() - start_time)
+            end_time = time.time()
+            times.append(end_time-start_time)
             rgb = rgb[0].cpu()
             depth = depth[0].cpu()
             all_rgb.append(rgb)
             all_depth.append(depth)
-        print(np.sum(times)/4)
+        print('mean: ', np.sum(times)/4.)
 
         all_rgb = torch.cat(all_rgb, dim=0)
         all_depth = torch.cat(all_depth, dim=0)

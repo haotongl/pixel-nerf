@@ -140,9 +140,9 @@ class LLFFDataset(torch.utils.data.Dataset):
         all_imgs = all_imgs[:, :, start_x:start_x+640, start_y:start_y+960]
         c = torch.tensor((480, 320), dtype=torch.float32)
         # ========
-        all_imgs = F.interpolate(all_imgs, None, scale_factor=0.5, align_corners=True, mode='bilinear', recompute_scale_factor=False)
-        c *= 0.5
-        focal *= 0.5
+        # all_imgs = F.interpolate(all_imgs, None, scale_factor=0.5, align_corners=True, mode='bilinear', recompute_scale_factor=False)
+        # c *= 0.5
+        # focal *= 0.5
         # =======
         scale = 0.1
         all_poses[:, :3, 3] *=scale
