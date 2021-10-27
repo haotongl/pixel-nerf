@@ -128,16 +128,19 @@ class LLFFDataset(torch.utils.data.Dataset):
         all_poses = [self._coord_trans_world @ torch.tensor(all_cam['poses'][i], dtype=torch.float32) @ self._coord_trans_cam for i in range(len(all_cam['poses']))]
         # all_poses_ = [torch.tensor(all_cam['poses'][i], dtype=torch.float32) for i in range(len(all_cam['poses']))]
         # all_poses = [torch.cat([pose[:, :1], -pose[:, 1:2], -pose[:, 2:3], pose[:, 3:]], dim=-1) for pose in all_poses_]
-        all_imgs = [self.image_to_tensor(imageio.imread(rgb_path)[..., :3]) for rgb_path in rgb_paths]
+        np_imgs = [imageio.imread(rgb_path) for rgb_path in rgb_paths]
+        H, W = np_imgs[0].shape[:2]
+        tar_h, tar_w = 640, 960
+        np_imgs = [cv2.resize(img, (tar_w, tar_h), interpolation=cv2.INTER_LINEAR) for img in np_imgs]
+        all_imgs = [self.image_to_tensor(img) for img in np_imgs]
         focal = all_cam['camera_params'][0][0] / 4.
         focal = torch.tensor((focal, focal), dtype=torch.float32)
+        focal[0] *= tar_w / W
+        focal[1] *= tar_h / H
         all_bboxes = None
         all_imgs = torch.stack(all_imgs)
         # all_poses = torch.Tensor(np.array(all_poses).astype(np.float32))
         all_poses = torch.stack(all_poses)
-        H, W = all_imgs.shape[2:]
-        start_x, start_y = (H-640)//2, (W-960)//2
-        all_imgs = all_imgs[:, :, start_x:start_x+640, start_y:start_y+960]
         c = torch.tensor((480, 320), dtype=torch.float32)
         # ========
         # all_imgs = F.interpolate(all_imgs, None, scale_factor=0.5, align_corners=True, mode='bilinear', recompute_scale_factor=False)
